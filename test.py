@@ -40,12 +40,12 @@
 from PIL import Image
 import numpy as np
 
-L_path = 'HR/image_SRF_4/Set14/img_003_SRF_4_HR.png'
+L_path = 'Set14/image_SRF_2/img_003_SRF_2_LR.png'
 L_image = Image.open(L_path)
 origin = np.array(L_image)
 print(origin.shape)
 # out = L_image.convert("RGB")
-# out.save('HR/image_SRF_4/Set14/img_003_SRF_4_HR.png')
+# out.save('Set14/image_SRF_4/img_003_SRF_4_LR.png')
 
 # img=Image.open('HR/image_SRF_2/Set14/img_003_SRF_2_HR.png')
 # a=np.array(img)
