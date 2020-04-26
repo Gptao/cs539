@@ -40,7 +40,7 @@
 from PIL import Image
 import numpy as np
 
-L_path = 'Set14/image_SRF_2/img_003_SRF_2_LR.png'
+L_path = 'Set14/image_SRF_4/img_003_SRF_4_LR.png'
 L_image = Image.open(L_path)
 origin = np.array(L_image)
 print(origin.shape)

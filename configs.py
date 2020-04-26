@@ -6,7 +6,6 @@ class Config:
     scale_factors = [[2.0, 2.0]]  # list of pairs (vertical, horizontal) for gradual increments in resolution
     base_change_sfs = []  # list of scales after which the input is changed to be the output (recommended for high sfs)
     max_iters = 3000
-
     min_iters = 256
     min_learning_rate = 9e-6  # this tells the algorithm when to stop (specify lower than the last learning-rate)
     width = 64
@@ -54,18 +53,18 @@ class Config:
     scale = [2, 4]  # 4x为[2,4]
     n_threads = 6
     seed = 1
-    rgb_range = 255
+    rgb_range = 1
     n_colors = 3
-    n_blocks = 15
+    n_blocks = 10
     n_feats = 20
     negval = 0.2
-    test_only = True
+    test_only = False
     dual_weight = 0.1
     save = './experiment'
     self_ensemble = False
     cpu = False
     n_GPUs = 1
-    pre_train = '.'
+    pre_train = 'pretrained_models/DRNL4x.pt'
     beta1 = 0.9
     beta2 = 0.999
     epsilon = 1e-8
@@ -125,4 +124,8 @@ X4_GRADUAL_IDEAL_CONF.scale_factors = [[1.0, 1.5], [1.5, 1.0], [1.5, 1.5], [1.5,
                                        [2.0, 2.5], [2.5, 2.0], [2.5, 2.5], [2.5, 3.0], [3.0, 2.5], [3.0, 3.0],
                                        [3.0, 3.5], [3.5, 3.0], [3.5, 3.5], [3.5, 4.0], [4.0, 3.5], [4.0, 4.0]]
 X4_GRADUAL_IDEAL_CONF.back_projection_iters = [6, 6, 8, 10, 10, 12, 14, 14, 16, 18, 18, 20, 22, 22, 24, 26, 26, 28]
-X4_GRADUAL_IDEAL_CONF.input_path = os.path.dirname(__file__) + '/Set14/image_SRF_4'
+X4_GRADUAL_IDEAL_CONF.input_path = os.path.dirname(__file__) + '/Set5/image_SRF_4'
+
+X4_ONE_JUMP_IDEAL_CONF = Config()
+X4_ONE_JUMP_IDEAL_CONF.scale_factors = [[4.0, 4.0]]
+X4_ONE_JUMP_IDEAL_CONF.input_path = os.path.dirname(__file__) + '/Set14/image_SRF_4'

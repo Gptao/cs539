@@ -76,7 +76,6 @@ class DRN(nn.Module):
                 conv(n_feats * pow(2, p), opt.n_colors, kernel_size)  # in 80 out 3  & in 40 out 3
             )
         self.tail = nn.ModuleList(tail)
-        print(self.tail)
         '''tail:
         ModuleList(
         (0): Conv2d(80, 3, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))

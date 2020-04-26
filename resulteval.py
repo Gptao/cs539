@@ -7,13 +7,12 @@ import glob
 
 def main():
     # Configurations
-
     # GT - Ground-truth;
     # Gen: Generated / Restored / Recovered images
-    folder_GT = 'HR/image_SRF_2/Set5'
-    folder_Gen = 'results/test_Apr_19_13_21_16'
+    folder_GT = 'HR/image_SRF_4/Set5'
+    folder_Gen = 'results/set5_4x_nogradual_drn_3000'
 
-    crop_border = 4
+    crop_border = 30
     suffix = ''  # suffix for Gen images
     test_Y = True  # True: test Y channel only; False: test RGB channels
 

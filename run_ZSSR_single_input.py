@@ -11,12 +11,10 @@ def main(input_img, ground_truth, kernels, gpu, conf, results_path):
 
     # 0 input for ground-truth or kernels means None
     ground_truth = None if ground_truth == '0' else ground_truth
-    print('*****', kernels)
     kernels = None if kernels == '0' else kernels.split(';')[:-1]
 
     # Setup configuration and results directory
     conf.result_path = results_path
-    print('fuck', conf.scale_factors)
     # Run ZSSR on the image
     net = ZSSR.ZSSR(input_img, conf, ground_truth, kernels)
     net.run()

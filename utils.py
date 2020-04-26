@@ -143,7 +143,7 @@ def random_augment(ims,
     return np.clip(warpPerspective(im, transform_mat, (crop_size, crop_size), flags=INTER_CUBIC), 0, 1)
 
 
-# 迭代的上下采样,将y_sr降采样与y_lr的残差上采样再合并到y_sr上   下->减->上->加
+# 迭代的上下采样,将y_sr降采样与y_lr的差上采样再合并到y_sr上   下->减->上->加
 # imresize(hr_father, output_shape=[hr_father.shape[0] / 2, hr_father.shape[1] / 2], kernel=self.kernel)
 def back_projection(y_sr, y_lr, down_kernel, up_kernel, sf=None):
     y_sr += imresize(y_lr - imresize(y_sr, output_shape=y_lr.shape[0:2],

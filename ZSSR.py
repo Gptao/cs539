@@ -8,6 +8,7 @@ from utils import *
 import drn
 from checkpoint import Checkpoint
 from common import DownBlock
+import cv2
 
 
 # 声明ZSSR实例，然后调用run方法
@@ -19,7 +20,6 @@ class ZSSR:
     lr_son = None
     sr = None
     sf = None
-    gt_per_sf = None
     final_sr = None
     hr_fathers_sources = []
 
@@ -51,9 +51,6 @@ class ZSSR:
         self.input = img.imread(input_img)
         # (256, 384, 3)
 
-        # For evaluation purposes, ground-truth image can be supplied.
-        self.gt = ground_truth if type(ground_truth) is not str else img.imread(ground_truth)
-
         # Preprocess the kernels. (see function to see what in includes).
         self.kernels = preprocess_kernels(kernels, conf)
 
@@ -83,6 +80,7 @@ class ZSSR:
             self.dual_models = self.dataparallel(self.dual_models, range(conf.n_GPUs))
         self.dual_optimizers = make_dual_optimizer(conf, self.dual_models)
         self.dual_scheduler = make_dual_scheduler(conf, self.dual_optimizers)
+        # self.load(self.checkpoint, pre_train=self.conf.pre_train, cpu=self.conf.cpu)
 
     # 入口,整个run函数是在不同尺度下和kernel下的大循环
     def run(self):
@@ -99,13 +97,18 @@ class ZSSR:
             self.output_shape = np.uint(np.ceil(np.array(self.input.shape[0:2]) * sf))
 
             # Initialize network
-            self.init_sess(init_weights=self.conf.init_net_for_each_sf)
+            self.loss = [None] * self.conf.max_iters
+            self.mse, self.mse_rec, self.interp_mse, self.interp_rec_mse, self.mse_steps = [], [], [], [], []
+            self.iter = 0
+            self.learning_rate = self.conf.learning_rate
+            self.learning_rate_change_iter_nums = [0]
 
             # Train the network
             self.train()  # 训练好几轮，每次都增强,结果保存在 self.train_output
 
             # Use augmented outputs and back projection to enhance result. Also save the result.
-            post_processed_output = self.final_test()  # 用的是最开始的输入,结果放入hr_fathers_sources
+            # post_processed_output = self.final_test()  # 用的是最开始的输入,结果放入hr_fathers_sources
+            post_processed_output = self.test(self.input)
             # Keep the results for the next scale factors SR to use as dataset
             self.hr_fathers_sources.append(post_processed_output)
 
@@ -148,21 +151,10 @@ class ZSSR:
                 model[i] = model[i].cuda()
         return model
 
-    def init_sess(self, init_weights=True):
-        # Sometimes we only want to initialize some meta-params but keep the weights as they were
-        if init_weights:
-            # Weight initialization
-            self.model.apply(self.weights_init_kaiming)
-        # Initialize all counters etc
-        self.loss = [None] * self.conf.max_iters
-        self.mse, self.mse_rec, self.interp_mse, self.interp_rec_mse, self.mse_steps = [], [], [], [], []
-        self.iter = 0
-        self.learning_rate = self.conf.learning_rate
-        self.learning_rate_change_iter_nums = [0]
-
     def father_to_son(self, hr_father):
         # Create son out of the father by downscaling and if indicated adding noise
         lr_son = imresize(hr_father, output_shape=[hr_father.shape[0] / 2, hr_father.shape[1] / 2], kernel=self.kernel)
+        # lr_son = cv2.resize(hr_father, dsize=(0, 0), fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
         return np.clip(lr_son + np.random.randn(*lr_son.shape) * self.conf.noise_std, 0, 1)
 
     # 在每次迭代前都进行数据增强
@@ -191,6 +183,9 @@ class ZSSR:
                                             shear_sigma=self.conf.augment_shear_sigma,
                                             crop_size=self.conf.crop_size)
             # hr_father.shape (128,128,3)
+            # plt.imsave('%s/%sHR_%s.png' %
+            #            (self.conf.result_path, os.path.basename(self.file_name)[:-6], str(self.iter)),
+            #            self.hr_father, vmin=0, vmax=1)
             # Get lr-son from hr-father 对于输入图像，要得到不同尺度的pair,4x需要经过降采样得到1x和2x,对于2x只需要一次
             lr_son = self.father_to_son(self.hr_father)
             self.hr_father = torch.tensor(self.hr_father, dtype=torch.float32).cuda().permute(2, 0, 1).unsqueeze(0)
@@ -224,9 +219,9 @@ class ZSSR:
             self.loss[self.iter] = loss_primary + self.conf.dual_weight * loss_dual
             cpu_loss = self.loss[self.iter].data.cpu().numpy()
             progress.set_description(
-                "Iteration: {iter} Loss: {loss}, Learning Rate: {lr}".format(iter=self.iter, loss=cpu_loss,
-                                                                             lr=self.learning_rate))
-            if self.iter > 0 and self.iter % 1000 == 0:
+                "Iter: {iter} Loss: {loss}, Lr: {lr}".format(iter=self.iter, loss=cpu_loss.round(4),
+                                                             lr=self.learning_rate))
+            if self.iter > 0 and self.iter % 2000 == 0:
                 self.learning_rate = self.learning_rate / 10
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = self.learning_rate
@@ -235,14 +230,18 @@ class ZSSR:
             optimizer.step()
 
             # stop when minimum learning rate was passed
-            if self.learning_rate < self.conf.min_learning_rate:
-                break
+            # if self.learning_rate < self.conf.min_learning_rate:
+            #     print('learning_rate terminated')
+            #     break
 
     def test(self, input):
         input = torch.tensor(np.ascontiguousarray(input), dtype=torch.float32).cuda().permute(2, 0, 1).unsqueeze(0)
         self.drnmodel.eval()
-        sr = self.drnmodel(input)
-        return np.clip(sr[-1].squeeze(0).permute(1, 2, 0).cpu().detach().numpy(), 0, 1)
+        sr = self.drnmodel(input)[-1].squeeze(0).permute(1, 2, 0).cpu()
+        sr = quantize(sr, self.conf.rgb_range)
+        sr = sr.detach().numpy()
+        return sr
+        # return np.clip(sr[-1].squeeze(0).permute(1, 2, 0).cpu().detach().numpy(), 0, 1)
 
     def final_test(self):  # input作为测试输入,八种几何变换
         # Run over 8 augmentations of input - 4 rotations and mirror (geometric self ensemble)
@@ -254,6 +253,9 @@ class ZSSR:
             test_input = np.rot90(self.input, k) if k < 4 else np.fliplr(np.rot90(self.input, k))
             # Apply network on the rotated input,此时不计算损失回传(相当于测试)
             tmp_output = self.test(test_input)
+            # plt.imsave('%s/%stest_.png' %
+            #            (self.conf.result_path, os.path.basename(self.file_name)[:-6]),
+            #            tmp_output, vmin=0, vmax=1)
             # 这里还原超分结果
             # Undo the rotation for the processed output (mind the opposite order of the flip and the rotation)
             tmp_output = np.rot90(tmp_output, -k) if k < 4 else np.rot90(np.fliplr(tmp_output), -k)
@@ -298,3 +300,74 @@ class ZSSR:
                 self.base_ind += 1
 
             print('base changed to %.2f' % self.base_sf)
+
+    def load(self, path, pre_train='.', cpu=False):
+        if cpu:
+            kwargs = {'map_location': lambda storage, loc: storage}
+        else:
+            kwargs = {}
+        #### load primal model ####
+        if pre_train != '.':
+            print('Loading model from {}'.format(pre_train))
+            self.get_model().load_state_dict(
+                torch.load(pre_train, **kwargs),
+                strict=False
+            )
+        #### load dual model #### 没有 dual model预训练模型，使用权重初始化
+        # if not self.conf.test_only:
+        #     for i in range(len(self.dual_models)):
+        #         if self.conf.pre_train != '.':
+        #             self.get_dual_model(i).apply(self.weights_init_kaiming)
+        # path = os.path.dirname(self.conf.pre_train)
+        # model_file = self.conf.pre_train.split('/')[-1]
+        # postfix = model_file.split('model_')[-1]
+        # load = os.path.join(path, 'dual_model_x{}_{}'.format(int(math.pow(2, i + 1)), postfix))
+        # print('Loading dual model from {}'.format(load))
+        # self.get_dual_model(i).load_state_dict(
+        #     torch.load(load, **kwargs),
+        #     strict=False
+        # )
+
+    def get_model(self):
+        if self.conf.n_GPUs == 1:
+            return self.drnmodel
+        else:
+            return self.drnmodel.module
+
+    def get_dual_model(self, idx):
+        if self.conf.n_GPUs == 1:
+            return self.dual_models[idx]
+        else:
+            return self.dual_models[idx].module
+
+    def state_dict(self, **kwargs):
+        target = self.get_model()
+        return target.state_dict(**kwargs)
+
+    # def count_parameters(self, model):
+    #     if self.conf.n_GPUs > 1:
+    #         return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    #     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    def save(self, path, epoch, is_best=False):
+        target = self.get_model()
+        torch.save(
+            target.state_dict(),
+            os.path.join(path, 'model', 'model_latest.pt')
+        )
+        if is_best:
+            torch.save(
+                target.state_dict(),
+                os.path.join(path, 'model', 'model_best.pt')
+            )
+        #### save dual models ####
+        for i in range(len(self.dual_models)):
+            torch.save(
+                self.get_dual_model(i).state_dict(),
+                os.path.join(path, 'model', 'dual_model_x{}_latest.pt'.format(int(math.pow(2, i + 1))))
+            )
+            if is_best:
+                torch.save(
+                    self.get_dual_model(i).state_dict(),
+                    os.path.join(path, 'model', 'dual_model_x{}_best.pt'.format(int(math.pow(2, i + 1))))
+                )
