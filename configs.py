@@ -50,7 +50,7 @@ class Config:
     save_results = True
 
     # DRN paras
-    scale = [2, 4]  # 4x为[2,4]
+    scale = 4  # 4x为[2,4]
     n_threads = 6
     seed = 1
     rgb_range = 1
@@ -59,12 +59,12 @@ class Config:
     n_feats = 20
     negval = 0.2
     test_only = False
-    dual_weight = 0.1
+    dual_weight = 0.1  # 0.1
+    cycle_weight = 0.005
     save = './experiment'
     self_ensemble = False
     cpu = False
     n_GPUs = 1
-    pre_train = 'pretrained_models/DRNL4x.pt'
     beta1 = 0.9
     beta2 = 0.999
     epsilon = 1e-8
@@ -86,46 +86,46 @@ class Config:
 # Basic default config (same as not specifying), non-gradual SRx2 with default bicubic kernel (Ideal case)
 # example is set to run on set14
 X2_ONE_JUMP_IDEAL_CONF = Config()
-X2_ONE_JUMP_IDEAL_CONF.input_path = os.path.dirname(__file__) + '/Set5/image_SRF_2'
+X2_ONE_JUMP_IDEAL_CONF.input_path = os.path.dirname(__file__) + '/Set5/image_SRF_4'
 
-# Same as above but with visualization (Recommended for one image, interactive mode, for debugging)
-X2_IDEAL_WITH_PLOT_CONF = Config()
-X2_IDEAL_WITH_PLOT_CONF.plot_losses = True
-X2_IDEAL_WITH_PLOT_CONF.run_test_every = 20
-X2_IDEAL_WITH_PLOT_CONF.input_path = os.path.dirname(__file__) + '/example_with_gt'
-
-# Gradual SRx2, to achieve superior results in the ideal case
-X2_GRADUAL_IDEAL_CONF = Config()
-X2_GRADUAL_IDEAL_CONF.scale_factors = [[1.0, 1.5], [1.5, 1.0], [1.5, 1.5], [1.5, 2.0], [2.0, 1.5], [2.0, 2.0]]
-X2_GRADUAL_IDEAL_CONF.back_projection_iters = [6, 6, 8, 10, 10, 12]
-X2_GRADUAL_IDEAL_CONF.input_path = os.path.dirname(__file__) + '/Set5/image_SRF_2'
-
-# Applying a given kernel. Rotations are canceled sense kernel may be non-symmetric
-X2_GIVEN_KERNEL_CONF = Config()
-X2_GIVEN_KERNEL_CONF.output_flip = False
-X2_GIVEN_KERNEL_CONF.augment_allow_rotation = False
-X2_GIVEN_KERNEL_CONF.back_projection_iters = [2]
-X2_GIVEN_KERNEL_CONF.input_path = os.path.dirname(__file__) + '/kernel_example'
-
-# An example for a typical setup for real images. (Kernel needed + mild unknown noise)
-# back-projection is not recommended because of the noise.
-X2_REAL_CONF = Config()
-X2_REAL_CONF.output_flip = False
-X2_REAL_CONF.back_projection_iters = [0]
-X2_REAL_CONF.input_path = os.path.dirname(__file__) + '/real_example'
-X2_REAL_CONF.noise_std = 0.0125
-X2_REAL_CONF.augment_allow_rotation = False
-X2_REAL_CONF.augment_scale_diff_sigma = 0
-X2_REAL_CONF.augment_shear_sigma = 0
-X2_REAL_CONF.augment_min_scale = 0.75
-
-X4_GRADUAL_IDEAL_CONF = Config()
-X4_GRADUAL_IDEAL_CONF.scale_factors = [[1.0, 1.5], [1.5, 1.0], [1.5, 1.5], [1.5, 2.0], [2.0, 1.5], [2.0, 2.0],
-                                       [2.0, 2.5], [2.5, 2.0], [2.5, 2.5], [2.5, 3.0], [3.0, 2.5], [3.0, 3.0],
-                                       [3.0, 3.5], [3.5, 3.0], [3.5, 3.5], [3.5, 4.0], [4.0, 3.5], [4.0, 4.0]]
-X4_GRADUAL_IDEAL_CONF.back_projection_iters = [6, 6, 8, 10, 10, 12, 14, 14, 16, 18, 18, 20, 22, 22, 24, 26, 26, 28]
-X4_GRADUAL_IDEAL_CONF.input_path = os.path.dirname(__file__) + '/Set5/image_SRF_4'
-
-X4_ONE_JUMP_IDEAL_CONF = Config()
-X4_ONE_JUMP_IDEAL_CONF.scale_factors = [[4.0, 4.0]]
-X4_ONE_JUMP_IDEAL_CONF.input_path = os.path.dirname(__file__) + '/Set14/image_SRF_4'
+# # Same as above but with visualization (Recommended for one image, interactive mode, for debugging)
+# X2_IDEAL_WITH_PLOT_CONF = Config()
+# X2_IDEAL_WITH_PLOT_CONF.plot_losses = True
+# X2_IDEAL_WITH_PLOT_CONF.run_test_every = 20
+# X2_IDEAL_WITH_PLOT_CONF.input_path = os.path.dirname(__file__) + '/example_with_gt'
+#
+# # Gradual SRx2, to achieve superior results in the ideal case
+# X2_GRADUAL_IDEAL_CONF = Config()
+# X2_GRADUAL_IDEAL_CONF.scale_factors = [[1.0, 1.5], [1.5, 1.0], [1.5, 1.5], [1.5, 2.0], [2.0, 1.5], [2.0, 2.0]]
+# X2_GRADUAL_IDEAL_CONF.back_projection_iters = [6, 6, 8, 10, 10, 12]
+# X2_GRADUAL_IDEAL_CONF.input_path = os.path.dirname(__file__) + '/Set5/image_SRF_2'
+#
+# # Applying a given kernel. Rotations are canceled sense kernel may be non-symmetric
+# X2_GIVEN_KERNEL_CONF = Config()
+# X2_GIVEN_KERNEL_CONF.output_flip = False
+# X2_GIVEN_KERNEL_CONF.augment_allow_rotation = False
+# X2_GIVEN_KERNEL_CONF.back_projection_iters = [2]
+# X2_GIVEN_KERNEL_CONF.input_path = os.path.dirname(__file__) + '/kernel_example'
+#
+# # An example for a typical setup for real images. (Kernel needed + mild unknown noise)
+# # back-projection is not recommended because of the noise.
+# X2_REAL_CONF = Config()
+# X2_REAL_CONF.output_flip = False
+# X2_REAL_CONF.back_projection_iters = [0]
+# X2_REAL_CONF.input_path = os.path.dirname(__file__) + '/real_example'
+# X2_REAL_CONF.noise_std = 0.0125
+# X2_REAL_CONF.augment_allow_rotation = False
+# X2_REAL_CONF.augment_scale_diff_sigma = 0
+# X2_REAL_CONF.augment_shear_sigma = 0
+# X2_REAL_CONF.augment_min_scale = 0.75
+#
+# X4_GRADUAL_IDEAL_CONF = Config()
+# X4_GRADUAL_IDEAL_CONF.scale_factors = [[1.0, 1.5], [1.5, 1.0], [1.5, 1.5], [1.5, 2.0], [2.0, 1.5], [2.0, 2.0],
+#                                        [2.0, 2.5], [2.5, 2.0], [2.5, 2.5], [2.5, 3.0], [3.0, 2.5], [3.0, 3.0],
+#                                        [3.0, 3.5], [3.5, 3.0], [3.5, 3.5], [3.5, 4.0], [4.0, 3.5], [4.0, 4.0]]
+# X4_GRADUAL_IDEAL_CONF.back_projection_iters = [6, 6, 8, 10, 10, 12, 14, 14, 16, 18, 18, 20, 22, 22, 24, 26, 26, 28]
+# X4_GRADUAL_IDEAL_CONF.input_path = os.path.dirname(__file__) + '/Set5/image_SRF_4'
+#
+# X4_ONE_JUMP_IDEAL_CONF = Config()
+# X4_ONE_JUMP_IDEAL_CONF.scale_factors = [[4.0, 4.0]]
+# X4_ONE_JUMP_IDEAL_CONF.input_path = os.path.dirname(__file__) + '/Set14/image_SRF_4'

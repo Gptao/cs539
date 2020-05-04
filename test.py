@@ -45,7 +45,7 @@ L_image = Image.open(L_path)
 origin = np.array(L_image)
 print(origin.shape)
 # out = L_image.convert("RGB")
-# out.save('Set14/image_SRF_4/img_003_SRF_4_LR.png')
+# out.save('Set14/image_SRF_2/img_003_SRF_2_LR.png')
 
 # img=Image.open('HR/image_SRF_2/Set14/img_003_SRF_2_HR.png')
 # a=np.array(img)
@@ -197,3 +197,72 @@ same as MATLAB's results
 #
 # if __name__ == '__main__':
 #     main()
+# -*- coding: utf-8 -*-
+# import logging
+# import time
+# from multiprocessing.dummy import Pool as ThreadPool
+#
+# from tqdm import tqdm
+#
+#
+# def get_logger(name):
+#     logger = logging.getLogger(name)
+#     logger.setLevel(logging.DEBUG)
+#     stream_handler = logging.StreamHandler()
+#     stream_handler.setLevel(logging.DEBUG)
+#     formatter = logging.Formatter(
+#         '%(asctime)s - %(name)s [%(levelname)s] %(message)s')
+#     stream_handler.setFormatter(formatter)
+#     logger.addHandler(stream_handler)
+#     return logger
+#
+#
+# def process(item):
+#     log = get_logger(str(item[0]))
+#     log.info("sum: {sum} ".format(sum=item[0]+item[1]))
+#     time.sleep(5)
+#
+#
+# items = [[1, 2], [3, 4], [5, 6], [7, 8]]
+# pool = ThreadPool()
+# pool.map(process, items)
+# pool.close()
+# pool.join()
+# import threading
+# import tkinter as tk
+# from time import ctime, sleep
+#
+# # 创建主窗口
+# window = tk.Tk()
+# window.title('测试')
+# window.geometry('630x200')
+#
+#
+# def music():
+#     for i in range(2):
+#         print("I was listening to music %s" % ctime())
+#         sleep(1)
+#
+#
+# def move():
+#     for i in range(2):
+#         print("I was at the movie  %s" % ctime())
+#         sleep(1)
+#
+#
+# def test():
+#     # 多线程
+#     threads = []
+#     t1 = threading.Thread(target=music)
+#     threads.append(t1)
+#     t2 = threading.Thread(target=move)
+#     threads.append(t2)
+#     for t in threads:
+#         t.setDaemon(True)
+#         t.start()
+#
+#
+# btn_download = tk.Button(window, text='启动', command=test)
+# btn_download.place(x=400, y=150)
+#
+# window.mainloop()

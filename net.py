@@ -1,6 +1,5 @@
-import math
-import torch
 from torch import nn
+import numpy as np
 
 
 class ZSSRNet(nn.Module):
@@ -18,10 +17,11 @@ class ZSSRNet(nn.Module):
 
         self.relu = nn.ReLU()
 
-    def forward(self, x):
-        x = x.unsqueeze(0).permute(0, 3, 1, 2)
+    def forward(self, y):
         # [1, 3, h, w]
         # 中间结果为[1,64,h,w]
+        # print('fuck', y.shape)
+        x = y.permute(2, 0, 1).unsqueeze(0)  # 图像 HWC 转 1CHW
         x = self.relu(self.conv0(x))
         x = self.relu(self.conv1(x))
         x = self.relu(self.conv2(x))
@@ -30,72 +30,45 @@ class ZSSRNet(nn.Module):
         x = self.relu(self.conv5(x))
         x = self.relu(self.conv6(x))
         x = self.conv7(x)
-        x = x.squeeze(0).permute(1, 2, 0)
-        # [h, w, c]
+        x = x.squeeze(0).permute(1, 2, 0)  # 1CHW 转 图像 HWC
 
-        return x
-
-
-class Generator(nn.Module):
-    def __init__(self, scale_factor):
-        upsample_block_num = int(math.log(scale_factor, 2))
-
-        super(Generator, self).__init__()
-        self.block1 = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=9, padding=4),
-            nn.PReLU()
-        )
-        self.block2 = ResidualBlock(64)
-        self.block3 = ResidualBlock(64)
-        self.block4 = ResidualBlock(64)
-        self.block5 = ResidualBlock(64)
-        self.block6 = ResidualBlock(64)
-        self.block7 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
-        block8 = [UpsampleBLock(64, 2) for _ in range(upsample_block_num)]
-        block8.append(nn.Conv2d(64, 3, kernel_size=9, padding=4))
-        self.block8 = nn.Sequential(*block8)
-
-    def forward(self, x):
-        block1 = self.block1(x)
-        block2 = self.block2(block1)
-        block3 = self.block3(block2)
-        block4 = self.block4(block3)
-        block5 = self.block5(block4)
-        block6 = self.block6(block5)
-        block7 = self.block7(block6)
-        block8 = self.block8(block1 + block7)
-
-        return (torch.tanh(block8) + 1) / 2
+        return x + y
 
 
-class ResidualBlock(nn.Module):
-    def __init__(self, channels):
-        super(ResidualBlock, self).__init__()
-        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(channels)
-        self.prelu = nn.PReLU()
-        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(channels)
+class DownBlock(nn.Module):
+    def __init__(self, opt, scale, nFeat=None, in_channels=None, out_channels=None):
+        super(DownBlock, self).__init__()
+        negval = opt.negval  # 0.2
+
+        if nFeat is None:
+            nFeat = opt.n_feats  # 20
+
+        if in_channels is None:
+            in_channels = opt.n_colors  # 3
+
+        if out_channels is None:
+            out_channels = opt.n_colors  # 3
+
+        dual_block = [
+            nn.Sequential(
+                nn.Conv2d(in_channels, nFeat, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.LeakyReLU(negative_slope=negval, inplace=True)
+            )
+        ]
+
+        for _ in range(1, int(np.log2(scale))):
+            dual_block.append(
+                nn.Sequential(
+                    nn.Conv2d(nFeat, nFeat, kernel_size=3, stride=2, padding=1, bias=False),
+                    nn.LeakyReLU(negative_slope=negval, inplace=True)
+                )
+            )
+
+        dual_block.append(nn.Conv2d(nFeat, out_channels, kernel_size=3, stride=1, padding=1, bias=False))
+
+        self.dual_module = nn.Sequential(*dual_block)
 
     def forward(self, x):
-        residual = self.conv1(x)
-        residual = self.bn1(residual)
-        residual = self.prelu(residual)
-        residual = self.conv2(residual)
-        residual = self.bn2(residual)
-
-        return x + residual
-
-
-class UpsampleBLock(nn.Module):
-    def __init__(self, in_channels, up_scale):
-        super(UpsampleBLock, self).__init__()
-        self.conv = nn.Conv2d(in_channels, in_channels * up_scale ** 2, kernel_size=3, padding=1)
-        self.pixel_shuffle = nn.PixelShuffle(up_scale)
-        self.prelu = nn.PReLU()
-
-    def forward(self, x):
-        x = self.conv(x)
-        x = self.pixel_shuffle(x)
-        x = self.prelu(x)
+        x = x.permute(2, 0, 1).unsqueeze(0)
+        x = self.dual_module(x)
         return x

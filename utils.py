@@ -145,11 +145,11 @@ def random_augment(ims,
 
 # 迭代的上下采样,将y_sr降采样与y_lr的差上采样再合并到y_sr上   下->减->上->加
 # imresize(hr_father, output_shape=[hr_father.shape[0] / 2, hr_father.shape[1] / 2], kernel=self.kernel)
-def back_projection(y_sr, y_lr, down_kernel, up_kernel, sf=None):
-    y_sr += imresize(y_lr - imresize(y_sr, output_shape=y_lr.shape[0:2],
-                                     kernel=down_kernel), output_shape=y_sr.shape[0:2],
-                     kernel=up_kernel)
-    return np.clip(y_sr, 0, 1)
+# def back_projection(y_sr, y_lr, down_kernel, up_kernel):
+#     y_sr += imresize(y_lr - imresize(y_sr, output_shape=y_lr.shape[0:2],
+#                                      kernel=down_kernel), output_shape=y_sr.shape[0:2],
+#                      kernel=up_kernel)
+#     return np.clip(y_sr, 0, 1)
 
 
 def preprocess_kernels(kernels, conf):
