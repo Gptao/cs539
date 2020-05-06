@@ -145,11 +145,11 @@ def random_augment(ims,
 
 # 迭代的上下采样,将y_sr降采样与y_lr的差上采样再合并到y_sr上   下->减->上->加
 # imresize(hr_father, output_shape=[hr_father.shape[0] / 2, hr_father.shape[1] / 2], kernel=self.kernel)
-# def back_projection(y_sr, y_lr, down_kernel, up_kernel):
-#     y_sr += imresize(y_lr - imresize(y_sr, output_shape=y_lr.shape[0:2],
-#                                      kernel=down_kernel), output_shape=y_sr.shape[0:2],
-#                      kernel=up_kernel)
-#     return np.clip(y_sr, 0, 1)
+def back_projection(y_sr, y_lr, down_kernel, up_kernel):
+    y_sr += imresize(y_lr - imresize(y_sr, output_shape=y_lr.shape[0:2],
+                                     kernel=down_kernel), output_shape=y_sr.shape[0:2],
+                     kernel=up_kernel)
+    return np.clip(y_sr, 0, 1)
 
 
 def preprocess_kernels(kernels, conf):
@@ -245,31 +245,6 @@ def quantize(img, rgb_range):
     return img.mul(pixel_range).clamp(0, 255).round().div(pixel_range)
 
 
-def calc_psnr(sr, hr, scale, rgb_range, benchmark=False):
-    if sr.size(-2) > hr.size(-2) or sr.size(-1) > hr.size(-1):
-        print("the dimention of sr image is not equal to hr's! ")
-        sr = sr[:, :, :hr.size(-2), :hr.size(-1)]
-    diff = (sr - hr).data.div(rgb_range)
-
-    if benchmark:
-        shave = scale
-        if diff.size(1) > 1:
-            # 创建一个新的Tensor，该Tensor的type和device都和原有Tensor一致，且无内容
-            convert = diff.new(1, 3, 1, 1)
-            convert[0, 0, 0, 0] = 65.738
-            convert[0, 1, 0, 0] = 129.057
-            convert[0, 2, 0, 0] = 25.064
-            diff.mul_(convert).div_(256)
-            diff = diff.sum(dim=1, keepdim=True)
-    else:
-        shave = scale + 6
-
-    valid = diff[:, :, shave:-shave, shave:-shave]
-    mse = valid.pow(2).mean()
-
-    return -10 * math.log10(mse)
-
-
 def make_optimizer(opt, my_model):
     # filter() 函数用于过滤序列，过滤掉不符合条件的元素，返回由符合条件元素组成的新列表。
     # 该接收两个参数，第一个为函数，第二个为序列，序列的每个元素作为参数传递给函数进行判断，然后返回 True 或 False，最后将返回 True 的元素放到新列表中。
@@ -352,3 +327,32 @@ def init_model(args):
         else:
             print('Use defaults n_blocks and n_feats.')
         args.dual = True
+
+
+def getTVLoss(self, x):
+    x = x.permute(2, 0, 1).unsqueeze(0)
+    batch_size = x.size()[0]
+    h_x = x.size()[2]
+    w_x = x.size()[3]
+    count_h = self.tensor_size(x[:, :, 1:, :])
+    count_w = self.tensor_size(x[:, :, :, 1:])
+    h_tv = torch.pow((x[:, :, 1:, :] - x[:, :, :h_x - 1, :]), 2).sum()
+    w_tv = torch.pow((x[:, :, :, 1:] - x[:, :, :, :w_x - 1]), 2).sum()
+    return (h_tv / count_h + w_tv / count_w) / batch_size
+
+
+def tensor_size(self, t):
+    return t.size()[1] * t.size()[2] * t.size()[3]
+
+
+def dataparallel(self, model, gpu_list):
+    ngpus = len(gpu_list)
+    assert ngpus != 0, "only support gpu mode"
+    assert torch.cuda.device_count() >= ngpus, "Invalid Number of GPUs"
+    assert isinstance(model, list), "Invalid Type of Dual model"
+    for i in range(len(model)):
+        if ngpus >= 2:
+            model[i] = nn.DataParallel(model[i], gpu_list).cuda()
+        else:
+            model[i] = model[i].cuda()
+    return model

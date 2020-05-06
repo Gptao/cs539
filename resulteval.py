@@ -9,13 +9,12 @@ def main():
     # Configurations
     # GT - Ground-truth;
     # Gen: Generated / Restored / Recovered images
-    folder_GT = 'HR/image_SRF_4/Set5'
-    folder_Gen = 'results/test_May_04_10_19_43'
+    folder_GT = 'HR/image_SRF_2/Set5'
+    folder_Gen = 'results/test_May_06_19_15_49'
 
-    crop_border = 4
+    crop_border = 2
     suffix = ''  # suffix for Gen images
     test_Y = True  # True: test Y channel only; False: test RGB channels
-
     PSNR_all = []
     SSIM_all = []
     img_list = sorted(glob.glob(folder_GT + '/*'))
