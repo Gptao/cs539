@@ -37,13 +37,13 @@
 # print('#######################################')
 ##########################################################################
 # 灰度图和rgb转换
-from PIL import Image
-import numpy as np
-
-L_path = 'Set14/image_SRF_4/img_003_SRF_4_LR.png'
-L_image = Image.open(L_path)
-origin = np.array(L_image)
-print(origin.shape)
+# from PIL import Image
+# import numpy as np
+#
+# L_path = 'Set14/image_SRF_4/img_003_SRF_4_LR.png'
+# L_image = Image.open(L_path)
+# origin = np.array(L_image)
+# print(origin.shape)
 # out = L_image.convert("RGB")
 # out.save('Set14/image_SRF_2/img_003_SRF_2_LR.png')
 
@@ -54,6 +54,7 @@ print(origin.shape)
 calculate the PSNR and SSIM.
 same as MATLAB's results
 '''
+
 # import os
 # import math
 # import numpy as np
@@ -266,3 +267,21 @@ same as MATLAB's results
 # btn_download.place(x=400, y=150)
 #
 # window.mainloop()
+import matplotlib.image as img
+from imresize import imresize
+import numpy as np
+
+
+def father_to_son(hr_father):
+    sf = np.array([1.0, 1.5])
+    lr_son = imresize(hr_father, 1.0 / sf, kernel='cubic')
+    print(lr_son.shape)
+    lr_son = imresize(lr_son, sf, kernel='cubic')
+    print(lr_son.shape)
+    return np.clip(lr_son, 0, 1)
+
+
+if __name__ == '__main__':
+    testimg = img.imread('Set14/image_SRF_4/img_003_SRF_4_LR.png')
+    son = father_to_son(testimg)
+    print(testimg.shape)

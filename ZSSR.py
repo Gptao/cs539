@@ -5,6 +5,7 @@ import torch.nn as nn
 from tqdm import tqdm
 from utils import *
 from net import ZSSRNet, Downnet
+from torch.nn import init
 
 
 class ZSSR:
@@ -63,7 +64,8 @@ class ZSSR:
             self.sf = np.array(sf) / np.array(self.base_sf)
             # self.sf [2. 2.]
             self.output_shape = np.uint(np.ceil(np.array(self.input.shape[0:2]) * sf))
-
+            self.model.apply(self.weights_init_kaiming)
+            self.downnet.apply(self.weights_init_kaiming)
             # Initialize network
             self.loss = [None] * self.conf.max_iters
             self.mse, self.mse_rec, self.interp_mse, self.interp_rec_mse, self.mse_steps = [], [], [], [], []
@@ -88,8 +90,17 @@ class ZSSR:
         # noinspection PyUnboundLocalVariable
         return post_processed_output
 
+    def weights_init_kaiming(self, m):
+        classname = m.__class__.__name__
+        if classname.find('Conv') != -1:
+            init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
+        elif classname.find('Linear') != -1:
+            init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
+        elif classname.find('BatchNorm2d') != -1:
+            init.normal(m.weight.data, 1.0, 0.02)
+            init.constant(m.bias.data, 0.0)
+
     def father_to_son(self, hr_father):
-        # Create son out of the father by downscaling and if indicated adding noise
         lr_son = imresize(hr_father, 1.0 / self.sf, kernel=self.kernel)
         return np.clip(lr_son + np.random.randn(*lr_son.shape) * self.conf.noise_std, 0, 1)
 
@@ -104,7 +115,6 @@ class ZSSR:
         #     param.requires_grad = False
         # self.loss_network = loss_network
         loss = nn.L1Loss()
-        # loss = nn.MSELoss()
         model_optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         downnet_optimizer = optim.Adam(self.downnet.parameters(), lr=self.learning_rate)
         # sampler 数据增强得到HR-LR pair
@@ -125,6 +135,7 @@ class ZSSR:
                                             shear_sigma=self.conf.augment_shear_sigma,
                                             crop_size=self.conf.crop_size)
 
+            lr_son = self.father_to_son(self.hr_father)
             lrs = []
             lr_son = self.hr_father
             lrs.append(lr_son)
@@ -138,16 +149,29 @@ class ZSSR:
             # 上采样
             for i in range(len(lrs) - 1):
                 # print('lr', lrs[i].shape)
-                interpolated = imresize(lrs[i], self.sf, lrs[i + 1].shape, self.conf.upscale_method)
+                interpolated = imresize(lrs[i], None, lrs[i + 1].shape, self.conf.upscale_method)
                 lrx2 = self.model(torch.tensor(interpolated, dtype=torch.float32).cuda())
                 x2.append(lrx2)
-                if self.phases == 2:
-                    interpolated = imresize(lrx2.cpu().detach().numpy(), self.sf, None, self.conf.upscale_method)
+                if self.phases == 2 and i < len(lrs) - 2:
+                    lrx2 = lrx2.cpu().detach().numpy()
+                    interpolated = imresize(lrx2, None, lrs[i + 2].shape, self.conf.upscale_method)
                     lrx4 = self.model(torch.tensor(interpolated, dtype=torch.float32).cuda())
                     x4.append(lrx4)
 
             interpolated = imresize(self.hr_father, self.sf, None, self.conf.upscale_method)
-            x2.append(self.model(torch.tensor(interpolated, dtype=torch.float32).cuda()))
+            target2x = self.model(torch.tensor(interpolated, dtype=torch.float32).cuda()).cpu().detach().numpy()
+            interpolated = imresize(target2x, self.sf, None, self.conf.upscale_method)
+            x4.append(self.model(torch.tensor(interpolated, dtype=torch.float32).cuda()))
+            # print('father:', self.hr_father.shape)
+            # print('lr:')
+            # for i in range(len(lrs)):
+            #     print(lrs[i].shape)
+            # print('2x:')
+            # for i in range(len(x2)):
+            #     print(x2[i].shape)
+            # print('4x:')
+            # for i in range(len(x4)):
+            #     print(x4[i].shape)
 
             # 转tensor
             for i in range(len(lrs)):
@@ -156,7 +180,6 @@ class ZSSR:
             # primary loss:
             loss_primary = torch.zeros(1).cuda()
             for i in range(len(lrs) - 1):
-                # print('fuck', x2[i].shape, lrs[i + 1].shape)
                 loss_primary += loss(x2[i], lrs[i + 1])
             if self.phases == 2:
                 for i in range(len(lrs) - 2):
@@ -164,30 +187,23 @@ class ZSSR:
 
             # dual loss
             target = None
-            interpolated = imresize(lrs[-1].cpu().detach().numpy(), [1 / i for i in self.sf], None,
-                                    self.conf.upscale_method)
+            interpolated = imresize(lrs[-1].cpu().detach().numpy(), 1 / self.sf, None, self.conf.upscale_method)
             for i in range(self.phases):
                 target = self.downnet(torch.tensor(interpolated, dtype=torch.float32).cuda())
-                interpolated = imresize(target.cpu().detach().numpy(), [1 / i for i in self.sf], None,
-                                        self.conf.upscale_method)
-            # print('fuck', target.shape, lrs[0].shape)
+                interpolated = imresize(target.cpu().detach().numpy(), 1 / self.sf, None, self.conf.upscale_method)
             loss_dual = loss(target, lrs[0])
 
             # circle loss
             loss_cycle = torch.zeros(1).cuda()
-            if self.phases == 2:
-                interpolated = imresize(x4[-1].cpu().detach().numpy(), [1 / i for i in self.sf], None,
-                                        self.conf.upscale_method)
-                target = self.downnet(torch.tensor(interpolated, dtype=torch.float32).cuda())
-                interpolated = imresize(target.cpu().detach().numpy(), [1 / i for i in self.sf], None,
-                                        self.conf.upscale_method)
+            if self.phases == 1:
+                interpolated = imresize(x2[-1].cpu().detach().numpy(), 1 / self.sf, None, self.conf.upscale_method)
                 target = self.downnet(torch.tensor(interpolated, dtype=torch.float32).cuda())
                 loss_cycle += loss(target, lrs[-1])
-            if self.phases == 1:
-                interpolated = imresize(x2[-1].cpu().detach().numpy(), [1 / i for i in self.sf], None,
-                                        self.conf.upscale_method)
+            if self.phases == 2:
+                interpolated = imresize(x4[-1].cpu().detach().numpy(), 1 / self.sf, None, self.conf.upscale_method)
                 target = self.downnet(torch.tensor(interpolated, dtype=torch.float32).cuda())
-                # print('fuck', target.shape, lrs[-1].shape)
+                interpolated = imresize(target.cpu().detach().numpy(), 1 / self.sf, None, self.conf.upscale_method)
+                target = self.downnet(torch.tensor(interpolated, dtype=torch.float32).cuda())
                 loss_cycle += loss(target, lrs[-1])
             # compute total loss
             self.loss[
@@ -222,10 +238,8 @@ class ZSSR:
         return sr
 
     def final_test(self, input):  # input作为测试输入,八种几何变换
-        # Run over 8 augmentations of input - 4 rotations and mirror (geometric self ensemble)
+        # geometric self ensemble
         outputs = []
-        # The weird range means we only do it once if output_flip is disabled
-        # We need to check if scale factor is symmetric to all dimensions, if not we will do 180 jumps rather than 90
         for k in range(0, 1 + 7 * self.conf.output_flip, 1 + int(self.sf[0] != self.sf[1])):
             # Rotate 90*k degrees and mirror flip when k>=4
             test_input = np.rot90(input, k) if k < 4 else np.fliplr(np.rot90(input, k))

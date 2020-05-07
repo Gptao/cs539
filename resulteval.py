@@ -10,7 +10,7 @@ def main():
     # GT - Ground-truth;
     # Gen: Generated / Restored / Recovered images
     folder_GT = 'HR/image_SRF_2/Set5'
-    folder_Gen = 'results/test_May_06_23_36_58'
+    folder_Gen = 'results/test_May_07_10_45_26'
 
     crop_border = 2
     suffix = ''  # suffix for Gen images
