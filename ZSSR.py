@@ -196,7 +196,7 @@ class ZSSR:
             progress.set_description(
                 "Iter: {iter} Loss: {loss}, Lr: {lr}".format(iter=self.iter, loss=cpu_loss.round(4),
                                                              lr=self.learning_rate))
-            if self.iter > 0 and self.iter % 1000 == 0:
+            if self.iter > 0 and self.iter % 2000 == 0:
                 self.learning_rate = self.learning_rate / 10
                 for param_group in model_optimizer.param_groups:
                     param_group['lr'] = self.learning_rate
