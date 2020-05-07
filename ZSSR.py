@@ -159,9 +159,12 @@ class ZSSR:
                     x4.append(lrx4)
 
             interpolated = imresize(self.hr_father, self.sf, None, self.conf.upscale_method)
-            target2x = self.model(torch.tensor(interpolated, dtype=torch.float32).cuda()).cpu().detach().numpy()
-            interpolated = imresize(target2x, self.sf, None, self.conf.upscale_method)
-            x4.append(self.model(torch.tensor(interpolated, dtype=torch.float32).cuda()))
+            target2x = self.model(torch.tensor(interpolated, dtype=torch.float32).cuda())
+            x2.append(target2x)
+            if self.phases==2:
+                target2x = target2x.cpu().detach().numpy()
+                interpolated = imresize(target2x, self.sf, None, self.conf.upscale_method)
+                x4.append(self.model(torch.tensor(interpolated, dtype=torch.float32).cuda()))
             # print('father:', self.hr_father.shape)
             # print('lr:')
             # for i in range(len(lrs)):
